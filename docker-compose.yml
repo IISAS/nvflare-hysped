@@ -1,0 +1,38 @@
+version: "3.9"
+name: hysped
+services:
+  dev:
+    hostname: ${HOSTNAME:-localhost}
+    ipc: host
+    build:
+      context: .
+      args:
+        NVFLARE_BRANCH: "${NVFLARE_BRANCH:-main}"
+      dockerfile: Dockerfile.nvflare-hysped-dev
+    image: iisas/nvflare-hysped-dev:latest
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ports:
+      - "8990:8888"
+      - "8991:6006"
+    volumes:
+      - dev_tf:/tf
+      - ${PWD}/volumes/dev/root/.netrc:/root/.netrc
+    restart: always
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  dev_tf:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/volumes/dev/tf
+

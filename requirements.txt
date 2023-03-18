@@ -1,0 +1,14 @@
+fastparquet
+graphviz
+jsonlines
+jupyterlab
+matplotlib
+numpy
+onnx
+pydot
+scikit-learn
+seaborn
+tensorflow-addons
+tqdm
+voila
+wandb

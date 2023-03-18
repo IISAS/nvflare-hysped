@@ -1,0 +1,33 @@
+FROM tensorflow/tensorflow:latest-gpu-jupyter as base
+
+ARG NVFLARE_BRANCH
+
+ENV SHELL=/bin/bash
+
+RUN source /etc/bash.bashrc
+
+RUN apt-get update -y
+RUN apt-get install -y zip git graphviz
+
+RUN pip install --upgrade pip
+RUN pip install --upgrade setuptools
+
+#
+# install NVFlare from github
+#
+WORKDIR /opt
+RUN git clone -b ${NVFLARE_BRANCH} https://github.com/NVIDIA/NVFlare.git
+WORKDIR /opt/NVFlare
+RUN pip install -e .
+
+#
+# install NVFlare from PyPi
+#
+# RUN pip install nvflare
+
+WORKDIR /tf
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+
+CMD ["bash", "-c", "source /etc/bash.bashrc && jupyter lab --notebook-dir=/tf --ip 0.0.0.0 --no-browser --allow-root"]
+
