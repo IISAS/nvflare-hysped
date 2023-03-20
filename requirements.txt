@@ -11,4 +11,4 @@ seaborn
 tensorflow-addons
 tqdm
 voila
-wandb
+wandb==0.13.10
