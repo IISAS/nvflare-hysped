@@ -1,0 +1,10 @@
+{
+  "name": "nvflare-hysped-hello-world",
+  "resource_spec": {},
+  "min_clients" : 4,
+  "deploy_map": {
+    "app": [
+      "@ALL"
+    ]
+  }
+}
