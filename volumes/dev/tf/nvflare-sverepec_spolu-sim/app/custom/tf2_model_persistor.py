@@ -19,6 +19,7 @@ import pandas as pd
 import tensorflow as tf
 import myModel3
 
+from datetime import datetime
 from nvflare.apis.event_type import EventType
 from nvflare.apis.fl_constant import FLContextKey
 from nvflare.apis.fl_context import FLContext
@@ -89,6 +90,11 @@ class TF2ModelPersistor(ModelPersistor):
         label_encoder_filename = os.path.join(self.data_dir, 'encoder-DRUH_DR.npy')
         self.num_classes = np.load(label_encoder_filename, allow_pickle=True).shape[0]
         self.log_info(fl_ctx, 'infered num_classes: %s' % str(self.num_classes))
+        
+        ts = int(datetime.timestamp(datetime.now()))
+        wandb_id = '%s-%d' % (fl_ctx.get_job_id(), ts)
+        wandb_id = fl_ctx.get_prop('WANDB_ID', wandb_id)
+        fl_ctx.set_prop('WANDB_ID', wandb_id, private=False, sticky=True)
 
         fl_ctx.sync_sticky()
 

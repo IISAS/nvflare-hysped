@@ -32,6 +32,9 @@ from wandb.keras import WandbMetricsLogger, WandbEvalCallback
 
 PROJECT_NAME = 'FL-HYSPED-sverepec_spolu'
 
+module_logger = logging.getLogger(__name__)
+module_logger.info('loading %s' % __name__)
+
 class SimpleTrainer(Executor):
     
     WANDB_SITE_RUNS = 'WANDB_SITE_RUNS'
@@ -44,10 +47,39 @@ class SimpleTrainer(Executor):
         self.test_data, self.test_labels = None, None
         self.model = None
         self.var_list = None
+        self.logger.info('__init__(epochs_per_round=%d)' % epochs_per_round)
 
     def handle_event(self, event_type: str, fl_ctx: FLContext):
+        self.logger.info('%s\t%s\tevent_type: %s' % (fl_ctx.get_identity_name(), fl_ctx.get_job_id(), str(event_type)))
         if event_type == EventType.START_RUN:
             self.setup(fl_ctx)
+        elif event_type == EventType.END_RUN:
+            if self.wandb:
+                self.wandb.finish()
+    
+    def setupWandB(self, fl_ctx: FLContext):
+        if self.wandb is None:
+            peer_context = fl_ctx.get_peer_context()
+            self.log_info(fl_ctx, 'PEER_CONTEXT: %s' % str(peer_context))
+            wandb_id = peer_context.get_prop('WANDB_ID')
+            wandb_id = '%s-%s' % (wandb_id, fl_ctx.get_identity_name())
+            self.log_info(fl_ctx, 'wandb_id: %s' % wandb_id)
+            self.wandb = wandb.init(
+                project=PROJECT_NAME,
+                id=wandb_id,
+                config={
+                    'job_id': fl_ctx.get_job_id(),
+                    'task_id': fl_ctx.get_prop(FLContextKey.TASK_ID, '?'),
+                    'identity_name': fl_ctx.get_identity_name(),
+                    'runtime_args': fl_ctx.get_prop(FLContextKey.ARGS)
+                },
+                resume=True,
+                reinit=True
+            )
+            # callbacks
+            self.callbacks = [
+                WandbMetricsLogger(),
+            ]
 
     def setup(self, fl_ctx: FLContext):
 
@@ -96,36 +128,7 @@ class SimpleTrainer(Executor):
         self.var_list = [k for k,v in model.get_weight_paths().items()]
         self.log_info(fl_ctx, 'var_list: %s' % str(self.var_list))
         
-        # wand
-        site_run_name = '%s-%s' % (fl_ctx.get_job_id(), fl_ctx.get_identity_name())
-        self.site_run_name = site_run_name
-        
-        wandb_site_runs = fl_ctx.get_prop(SimpleTrainer.WANDB_SITE_RUNS, None)
-        
-        if wandb_site_runs is None:
-            wandb_site_runs = {}
-            fl_ctx.set_prop(SimpleTrainer.WANDB_SITE_RUNS, wandb_site_runs, private=True, sticky=True)
-        else:
-            self.log_info(fl_ctx, 'wandb_site_runs.keys(): %s' % ','.join([k for k in wandb_site_runs.keys()]))
-            
-        if site_run_name not in wandb_site_runs.keys():
-            self.log_info(fl_ctx, 'creating run: %s' % site_run_name)
-            wandb_site_runs[site_run_name] = {
-                'run': wandb.init(
-                    project=PROJECT_NAME,
-                    config={
-                        'job_id': fl_ctx.get_job_id(),
-                        'identity_name': fl_ctx.get_identity_name(),
-                        'runtime_args': fl_ctx.get_prop(FLContextKey.ARGS)
-                    },
-                    resume=True
-                ),
-                'callbacks': [
-                    WandbMetricsLogger(),
-                ]
-            }
-            fl_ctx.set_prop(SimpleTrainer.WANDB_SITE_RUNS, wandb_site_runs, private=True, sticky=True)
-        
+        self.wandb = None       
         self.model = model
         
     def execute(
@@ -158,7 +161,11 @@ class SimpleTrainer(Executor):
 
         if task_name != 'train':
             return make_reply(ReturnCode.TASK_UNKNOWN)
-
+        
+        
+        # wandb
+        self.setupWandB(fl_ctx)
+        
         dxo = from_shareable(shareable)
         model_weights = dxo.data
         # self.log_info(fl_ctx, 'nmodel_weights: %s' % str(model_weights))
@@ -189,7 +196,7 @@ class SimpleTrainer(Executor):
             self.train_labels,
             epochs=self.epochs_per_round,
             validation_data=(self.test_data, self.test_labels),
-            callbacks=fl_ctx.get_prop(SimpleTrainer.WANDB_SITE_RUNS)[self.site_run_name]['callbacks']
+            callbacks=self.callbacks
         )
 
         # report updated weights in shareable

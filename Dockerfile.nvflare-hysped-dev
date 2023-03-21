@@ -7,7 +7,7 @@ ENV SHELL=/bin/bash
 RUN source /etc/bash.bashrc
 
 RUN apt-get update -y
-RUN apt-get install -y zip git graphviz
+RUN apt-get install -y zip git graphviz vim
 
 RUN pip install --upgrade pip
 RUN pip install --upgrade setuptools
