@@ -1,4 +1,5 @@
 fastparquet
+geopandas
 graphviz
 jaxlib==0.3.22
 jsonlines
