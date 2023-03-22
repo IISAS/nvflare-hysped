@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# use GPU if previously disabled (-1)
+import os
+del os.environ['CUDA_VISIBLE_DEVICES']
+
 import logging
 import numpy as np
-import os
 import pandas as pd
 import tensorflow as tf
 import wandb
@@ -32,8 +35,34 @@ from wandb.keras import WandbMetricsLogger, WandbEvalCallback
 
 PROJECT_NAME = 'FL-HYSPED-sverepec_spolu'
 
+TF_FORCE_GPU_ALLOW_GROWTH = 'TF_FORCE_GPU_ALLOW_GROWTH'
+TF_GPU_MEMORY_LIMIT ='TF_GPU_MEMORY_LIMIT'
+
 module_logger = logging.getLogger(__name__)
 module_logger.info('loading %s' % __name__)
+
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    # configure utilization of GPUs
+    try:
+        for gpu in gpus:
+            # memory growth setting
+            if TF_FORCE_GPU_ALLOW_GROWTH in os.environ.keys():
+                force_growth = os.environ[TF_FORCE_GPU_ALLOW_GROWTH].lower() == 'true'
+                tf.config.experimental.set_memory_growth(gpu, force_growth)
+                module_logger.info('%s %s: %s' % (gpu.name, TF_FORCE_GPU_ALLOW_GROWTH, force_growth))
+            if TF_GPU_MEMORY_LIMIT in os.environ.keys():
+                memory_limit = int(os.environ[TF_GPU_MEMORY_LIMIT])
+                tf.config.set_logical_device_configuration(
+                    gpu,
+                    [tf.config.LogicalDeviceConfiguration(memory_limit=memory_limit)]
+                )
+                module_logger.info('%s %s: %d' % (gpu.name, TF_GPU_MEMORY_LIMIT, memory_limit))
+        logical_gpus = tf.config.list_logical_devices('GPU')
+        module_logger.info('%d Physical GPUs, %d Logical GPUs' % (len(gpus), len(logical_gpus)))
+    except RuntimeError as e:
+        # Virtual devices must be set before GPUs have been initialized
+        module_logger.error(e)
 
 class SimpleTrainer(Executor):
     
@@ -61,15 +90,18 @@ class SimpleTrainer(Executor):
         if self.wandb is None:
             peer_context = fl_ctx.get_peer_context()
             self.log_info(fl_ctx, 'PEER_CONTEXT: %s' % str(peer_context))
-            wandb_id = peer_context.get_prop('WANDB_ID')
-            wandb_id = '%s-%s' % (wandb_id, fl_ctx.get_identity_name())
+            timestamp = peer_context.get_prop('JOB_START_TIMESTAMP')
+            job_name = '%s-%s' % (fl_ctx.get_job_id(), timestamp)
+            wandb_id = '%s-%s' % (job_name, fl_ctx.get_identity_name())
             self.log_info(fl_ctx, 'wandb_id: %s' % wandb_id)
             self.wandb = wandb.init(
                 project=PROJECT_NAME,
                 id=wandb_id,
                 config={
                     'job_id': fl_ctx.get_job_id(),
-                    'task_id': fl_ctx.get_prop(FLContextKey.TASK_ID, '?'),
+                    'job_name': job_name,
+                    'job_start_timestamp': timestamp,
+                    'task_id': fl_ctx.get_prop(FLContextKey.TASK_ID, None),
                     'identity_name': fl_ctx.get_identity_name(),
                     'runtime_args': fl_ctx.get_prop(FLContextKey.ARGS)
                 },

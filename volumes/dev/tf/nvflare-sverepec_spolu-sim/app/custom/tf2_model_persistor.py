@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# do not use GPU at the FL server side (useful for running simulations)
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
+
 import json
 import numpy as np
-import os
 import pandas as pd
 import tensorflow as tf
 import myModel3
@@ -27,6 +30,14 @@ from nvflare.app_common.abstract.model import ModelLearnable, make_model_learnab
 from nvflare.app_common.abstract.model_persistor import ModelPersistor
 from nvflare.app_common.app_constant import AppConstants
 from nvflare.fuel.utils import fobs
+
+# session = tf.compat.v1.Session(
+#     config = tf.compat.v1.ConfigProto(
+#         # gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8)
+#         device_count = {'GPU': 0}
+#     )
+# )
+# tf.compat.v1.keras.backend.set_session(session)
 
 class TF2ModelPersistor(ModelPersistor):
     
@@ -91,10 +102,8 @@ class TF2ModelPersistor(ModelPersistor):
         self.num_classes = np.load(label_encoder_filename, allow_pickle=True).shape[0]
         self.log_info(fl_ctx, 'infered num_classes: %s' % str(self.num_classes))
         
-        ts = int(datetime.timestamp(datetime.now()))
-        wandb_id = '%s-%d' % (fl_ctx.get_job_id(), ts)
-        wandb_id = fl_ctx.get_prop('WANDB_ID', wandb_id)
-        fl_ctx.set_prop('WANDB_ID', wandb_id, private=False, sticky=True)
+        timestamp = int(datetime.timestamp(datetime.now()))
+        fl_ctx.set_prop('JOB_START_TIMESTAMP', timestamp, private=False, sticky=True)
 
         fl_ctx.sync_sticky()
 

@@ -13,6 +13,10 @@ services:
     ulimits:
       memlock: -1
       stack: 67108864
+    environment:
+      - TF_FORCE_GPU_ALLOW_GROWTH=${TF_FORCE_GPU_ALLOW_GROWTH}
+      - TF_GPU_MEMORY_LIMIT=${TF_GPU_MEMORY_LIMIT}
+      - TF_GPU_ALLOCATOR=cuda_malloc_async
     ports:
       - "8990:8888"
       - "8991:6006"
