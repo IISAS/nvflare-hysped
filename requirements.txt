@@ -1,3 +1,4 @@
+contextily
 fastparquet
 geopandas
 graphviz
@@ -7,6 +8,7 @@ jupyterlab
 matplotlib
 numpy
 onnx
+openpyxl
 pydot
 scikit-learn
 seaborn
@@ -14,4 +16,3 @@ tensorflow-addons
 tqdm
 voila
 wandb==0.13.10
-xlwt
