@@ -30,14 +30,8 @@ from nvflare.app_common.abstract.model import ModelLearnable, make_model_learnab
 from nvflare.app_common.abstract.model_persistor import ModelPersistor
 from nvflare.app_common.app_constant import AppConstants
 from nvflare.fuel.utils import fobs
-
-# session = tf.compat.v1.Session(
-#     config = tf.compat.v1.ConfigProto(
-#         # gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.8)
-#         device_count = {'GPU': 0}
-#     )
-# )
-# tf.compat.v1.keras.backend.set_session(session)
+from tf2_common.tf2_constants import Constants as TF2Constants
+from tf2_common.tf2_utils import Utils as TF2Utils
 
 class TF2ModelPersistor(ModelPersistor):
     
@@ -102,9 +96,12 @@ class TF2ModelPersistor(ModelPersistor):
         self.num_classes = np.load(label_encoder_filename, allow_pickle=True).shape[0]
         self.log_info(fl_ctx, 'infered num_classes: %s' % str(self.num_classes))
         
-        timestamp = int(datetime.timestamp(datetime.now()))
-        fl_ctx.set_prop('JOB_START_TIMESTAMP', timestamp, private=False, sticky=True)
-
+        # set job_start_timestamp, job_name
+        job_start_timestamp = int(datetime.timestamp(datetime.now()))
+        fl_ctx.set_prop(TF2Constants.JOB_START_TIMESTAMP, job_start_timestamp, private=False, sticky=True)
+        job_name = TF2Utils.generate_job_name(fl_ctx.get_job_id(), job_start_timestamp)
+        fl_ctx.set_prop(TF2Constants.JOB_NAME, job_name, private=False, sticky=True)
+        
         fl_ctx.sync_sticky()
 
     def load_model(self, fl_ctx: FLContext) -> ModelLearnable:
@@ -160,3 +157,9 @@ class TF2ModelPersistor(ModelPersistor):
                 'model.h5'
             )
         )
+        engine = fl_ctx.get_engine()
+        job_id = fl_ctx.get_prop(FLContextKey.CURRENT_RUN)
+        run_dir = engine.get_workspace().get_run_dir(job_id)
+        model_path = os.path.join(run_dir, 'models')
+        model_save_path = os.path.join(model_path, '%s.h5' % TF2Constants.GLOBAL_MODEL_NAME)
+        model.save(model_save_path)

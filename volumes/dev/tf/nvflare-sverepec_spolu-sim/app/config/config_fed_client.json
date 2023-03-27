@@ -3,12 +3,16 @@
   "executors": [
     {
       "tasks": [
-        "train"
+        "train",
+        "validate",
+        "submit_model"
       ],
       "executor": {
         "path": "trainer.SimpleTrainer",
         "args": {
-          "epochs_per_round": 2
+          "epochs_per_round": 2,
+          "num_classes": 14,
+          "label_col": "DRUH_DR"
         }
       }
     }
@@ -16,7 +20,8 @@
   "task_result_filters": [
     {
       "tasks": [
-        "train"
+        "train",
+        "validate"
       ],
       "filters": [
         {
