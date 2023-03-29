@@ -1,5 +1,6 @@
 contextily
 fastparquet
+geocube
 geopandas
 graphviz
 jaxlib==0.3.22
