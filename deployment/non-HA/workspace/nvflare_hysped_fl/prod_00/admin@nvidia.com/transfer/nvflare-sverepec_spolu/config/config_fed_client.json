@@ -1,0 +1,39 @@
+{
+  "format_version": 2,
+  "executors": [
+    {
+      "tasks": [
+        "train",
+        "validate",
+        "submit_model"
+      ],
+      "executor": {
+        "path": "trainer.SimpleTrainer",
+        "args": {
+          "epochs_per_round": 2,
+          "num_classes": 14,
+          "label_col": "DRUH_DR",
+          "wandb_key":  ""
+        }
+      }
+    }
+  ],
+  "task_result_filters": [
+    {
+      "tasks": [
+        "train",
+        "validate"
+      ],
+      "filters": [
+        {
+          "path": "filter.ExcludeVars",
+          "args": {
+            "exclude_vars": [
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "task_data_filters": []
+}

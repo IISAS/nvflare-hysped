@@ -1,0 +1,16 @@
+contextily
+fastparquet
+geopandas
+graphviz
+jaxlib
+jsonlines
+jupyterlab
+matplotlib
+numpy
+onnx
+openpyxl
+pydot
+scikit-learn
+seaborn
+tensorflow-addons
+wandb
