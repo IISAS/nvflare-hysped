@@ -12,22 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import logging
+
 module_logger = logging.getLogger(__name__)
 module_logger.info('loading %s' % __name__)
+module_logger.setLevel(logging.DEBUG)
 
-# use GPU if previously disabled (-1)
-import os
-if 'CUDA_VISIBLE_DEVICES' in os.environ.keys():
-    module_logger.info('os.environ[\'CUDA_VISIBLE_DEVICES\']: %s' % os.environ['CUDA_VISIBLE_DEVICES'])
-    module_logger.info('del os.environ[\'CUDA_VISIBLE_DEVICES\']')
-    del os.environ['CUDA_VISIBLE_DEVICES']
-
+import myModel3
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import wandb
-import myModel3
 
 from keras.utils.np_utils import to_categorical
 from nvflare.apis.dxo import DXO, DataKind, from_shareable
@@ -43,30 +39,49 @@ from tf2_common.tf2_constants import Constants as TF2Constants
 from tf2_common.tf2_utils import Utils as TF2Utils
 from wandb.keras import WandbMetricsLogger, WandbEvalCallback
 
-PROJECT_NAME = 'FL-HYSPED-sverepec_spolu'
-
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     # configure utilization of GPUs
-    try:
-        for gpu in gpus:
-            # memory growth setting
-            if TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH in os.environ.keys():
-                force_growth = os.environ[TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH].lower() == 'true'
-                tf.config.experimental.set_memory_growth(gpu, force_growth)
-                module_logger.info('%s %s: %s' % (gpu.name, TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH, force_growth))
+    for gpu in gpus:
+        
+        module_logger.info('physical GPU: %s' % str(gpu))
+        
+#        try:
+#            # memory growth setting
+#            if TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH in os.environ.keys():
+#                force_growth = os.environ[TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH].lower() == 'true'
+#                module_logger.info('setting %s=%s for %s ...' % (TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH, force_growth, gpu.name))
+#                tf.config.experimental.set_memory_growth(gpu, force_growth)
+#                module_logger.info('%s %s: %s' % (gpu.name, TF2Constants.TF_FORCE_GPU_ALLOW_GROWTH, force_growth))
+#        except Exception as e:
+#            # Virtual devices must be set before GPUs have been initialized
+#            module_logger.error(e)
+            
+        try:
             if TF2Constants.TF_GPU_MEMORY_LIMIT in os.environ.keys():
                 memory_limit = int(os.environ[TF2Constants.TF_GPU_MEMORY_LIMIT])
+                module_logger.info('setting %s=%s for %s ...' % (TF2Constants.TF_GPU_MEMORY_LIMIT, memory_limit, gpu.name))
                 tf.config.set_logical_device_configuration(
                     gpu,
                     [tf.config.LogicalDeviceConfiguration(memory_limit=memory_limit)]
                 )
                 module_logger.info('%s %s: %d' % (gpu.name, TF2Constants.TF_GPU_MEMORY_LIMIT, memory_limit))
-        logical_gpus = tf.config.list_logical_devices('GPU')
-        module_logger.info('%d Physical GPUs, %d Logical GPUs' % (len(gpus), len(logical_gpus)))
-    except RuntimeError as e:
-        # Virtual devices must be set before GPUs have been initialized
-        module_logger.error(e)
+        except Exception as e:
+            # Virtual devices must be set before GPUs have been initialized
+            module_logger.error(e)
+            
+    module_logger.info('%d Physical GPUs' % (len(gpus)))
+
+
+try:
+    gpus = tf.config.list_logical_devices('GPU')
+    if gpus:
+        # list logical GPUs
+        for gpu in gpus:
+            module_logger.info('logical GPU: %s' % str(gpu))
+        module_logger.info('%d Logical GPUs' % (len(gpus)))
+except Exception as e:
+    module_logger.error(e)
 
 class SimpleTrainer(Executor):
     
@@ -77,7 +92,8 @@ class SimpleTrainer(Executor):
         epochs_per_round,
         num_classes,
         label_col,
-        wandb_key
+        wandb_key,
+        project_name
     ):
         # Init functions of components should be very minimal. Init
         # is called when json is read. A big init will cause json loading to halt
@@ -85,11 +101,13 @@ class SimpleTrainer(Executor):
         super().__init__()
         
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.INFO)
         
         self.epochs_per_round = epochs_per_round
         self.num_classes = num_classes
         self.label_col = label_col
         self.wandb_key = wandb_key
+        self.project_name = project_name
         
         self.in_simulation = False
         self.wandb = None
@@ -124,7 +142,7 @@ class SimpleTrainer(Executor):
     def _is_in_simulation(self):
         return self.in_simulation
 
-    def _initWandB(self, fl_ctx: FLContext, project=PROJECT_NAME):
+    def _initWandB(self, fl_ctx: FLContext):
 
         if self.wandb is not None:
             # already initialized
@@ -152,7 +170,7 @@ class SimpleTrainer(Executor):
         self.log_info(fl_ctx, 'wandb_id: %s' % wandb_id)
 
         self.wandb = wandb.init(
-            project=project,
+            project=self.project_name,
             id=wandb_id,
             config={
                 'job_id': fl_ctx.get_job_id(),

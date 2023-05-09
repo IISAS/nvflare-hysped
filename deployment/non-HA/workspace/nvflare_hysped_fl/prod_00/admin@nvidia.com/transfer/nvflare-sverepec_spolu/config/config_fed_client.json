@@ -13,7 +13,8 @@
           "epochs_per_round": 2,
           "num_classes": 14,
           "label_col": "DRUH_DR",
-          "wandb_key":  ""
+          "wandb_key":  "fc41fd18733703cc1825715d7f1739cf43f36782",
+	  "project_name": "FL-HYSPED-sverepec_spolu"
         }
       }
     }

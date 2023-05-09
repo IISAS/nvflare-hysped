@@ -30,6 +30,7 @@ from nvflare.app_common.abstract.model import ModelLearnable, make_model_learnab
 from nvflare.app_common.abstract.model_persistor import ModelPersistor
 from nvflare.app_common.app_constant import AppConstants
 from nvflare.fuel.utils import fobs
+from nvflare.private.fed.simulator.simulator_app_runner import SimulatorClientRunManager
 from tf2_common.tf2_constants import Constants as TF2Constants
 from tf2_common.tf2_utils import Utils as TF2Utils
 
@@ -41,6 +42,7 @@ class TF2ModelPersistor(ModelPersistor):
         self.data_dir = None
         self.input_shape = None
         self.num_classes = None
+        self.in_simulation = False
 
     def _initialize(self, fl_ctx: FLContext):
         # get save path from FLContext
@@ -80,21 +82,31 @@ class TF2ModelPersistor(ModelPersistor):
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
 
-        self.log_info(fl_ctx, 'cwd: %s' % os.getcwd())
-        self.data_dir = os.path.join('..', 'data')
-        self.log_info(fl_ctx, 'data_dir: %s' % os.path.abspath(self.data_dir))
+        #engine = fl_ctx.get_engine()
+        #if isinstance(engine, SimulatorClientRunManager):
+        #    self.in_simulation = True
+        #job_id = fl_ctx.get_prop(FLContextKey.CURRENT_RUN)
+        #run_dir = engine.get_workspace().get_run_dir(job_id)
+        #self.log_info(fl_ctx, 'run_dir: %s' % os.path.abspath(run_dir))
+        #
+        # resolve data dir
+        #self.data_dir = os.path.join(run_dir, '..', 'data')
+        #if self.in_simulation:
+        #    client_name = fl_ctx.get_identity_name()
+        #    self.data_dir = os.path.join(run_dir, '..', '..', 'data', fl_ctx.get_identity_name())
+        #self.log_info(fl_ctx, 'data_dir: %s' % os.path.abspath(self.data_dir))
 
-        # infer the input shape from the site-1 train data;
+        # infer the input shape from the site train data;
         # i.e., from the first row to skip loading whole data
-        filename_train = os.path.join(self.data_dir, 'site-1', 'train.csv')
-        df_train = pd.read_csv(filename_train, nrows=1)
-        self.input_shape = (df_train.shape[1] - 1,)
-        self.log_info(fl_ctx, 'infered input_shape: %s' % str(self.input_shape))
+        #filename_train = os.path.join(self.data_dir, 'train.csv')
+        #df_train = pd.read_csv(filename_train, nrows=1)
+        #self.input_shape = (df_train.shape[1] - 1,)
+        #self.log_info(fl_ctx, 'infered input_shape: %s' % str(self.input_shape))
 
         # infer the number of classes from the label encoder
-        label_encoder_filename = os.path.join(self.data_dir, 'encoder-DRUH_DR.npy')
-        self.num_classes = np.load(label_encoder_filename, allow_pickle=True).shape[0]
-        self.log_info(fl_ctx, 'infered num_classes: %s' % str(self.num_classes))
+        #label_encoder_filename = os.path.join(self.data_dir, 'encoder-DRUH_DR.npy')
+        #self.num_classes = np.load(label_encoder_filename, allow_pickle=True).shape[0]
+        #self.log_info(fl_ctx, 'infered num_classes: %s' % str(self.num_classes))
         
         # set job_start_timestamp, job_name
         job_start_timestamp = int(datetime.timestamp(datetime.now()))
@@ -115,11 +127,11 @@ class TF2ModelPersistor(ModelPersistor):
         """
 
         if os.path.exists(self._fobs_save_path):
-            self.log_info(fl_ctx, 'Loading server weights ...')
+            self.log_info(fl_ctx, 'Loading global model weights ...')
             with open(self._fobs_save_path, "rb") as f:
                 model_learnable = fobs.load(f)
         else:
-            self.log_info(fl_ctx, 'Initializing server model ...')
+            self.log_info(fl_ctx, 'Initializing global model ...')
                         
             # compile a model
             model = myModel3.load_model(load_weights=False)
@@ -129,6 +141,7 @@ class TF2ModelPersistor(ModelPersistor):
             self.log_debug(fl_ctx, "var_dict: %s" % str(var_dict))
             
             model_learnable = make_model_learnable(var_dict, dict())
+            self.log_info(fl_ctx, 'global model initilized')
             
         return model_learnable
 
